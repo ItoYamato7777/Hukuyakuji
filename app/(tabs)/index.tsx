@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Button,
   PermissionsAndroid,
-  Platform,
+  Platform, // Log表示用にScrollViewを追加
+  SafeAreaView, // Buttonコンポーネントを追加
+  ScrollView,
   StyleSheet,
   Text,
   View,
-  Button, // Buttonコンポーネントを追加
-  ScrollView, // Log表示用にScrollViewを追加
-  SafeAreaView, // SafeAreaViewを追加
 } from "react-native";
 import { BleManager, Device } from "react-native-ble-plx";
 import { atob } from "react-native-quick-base64";
@@ -16,7 +16,7 @@ import { atob } from "react-native-quick-base64";
 const bleManager = new BleManager();
 
 // ターゲットデバイス名とUUID（実際の値に置き換えてください）
-const TARGET_DEVICE_NAME = "Hukumikuji"; 
+const TARGET_DEVICE_NAME = "Hukuyakuji";
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914a"; //
 const STEP_DATA_CHAR_UUID = "beefcafe-36e1-4688-b7f5-00000000000c"; //
 
@@ -74,7 +74,7 @@ async function requestBluetoothPermissions() {
 export default function BleTestScreen() {
   const [logs, setLogs] = useState<string[]>([]);
   const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
-  const [stepCount, setStepCount] = useState<string | number>("N/A");
+  const [Distance, setDistance] = useState<string | number>("N/A");
 
   const deviceRef = useRef<Device | null>(null);
 
@@ -143,7 +143,7 @@ export default function BleTestScreen() {
       .then((deviceWithServices) => {
         addLog("Services and characteristics discovered.");
         // 特定のキャラクタリスティックを監視
-        monitorStepCharacteristic(deviceWithServices);
+        monitorDistanceCharacteristic(deviceWithServices);
       })
       .catch((error) => {
         addLog(`Connection Error: ${error.message}`);
@@ -153,7 +153,7 @@ export default function BleTestScreen() {
   };
 
   // キャラクタリスティック監視
-  const monitorStepCharacteristic = (device: Device) => {
+  const monitorDistanceCharacteristic = (device: Device) => {
     addLog(`Looking for service: ${SERVICE_UUID}`);
     device.services().then(services => {
       const service = services.find(s => s.uuid === SERVICE_UUID);
@@ -177,7 +177,7 @@ export default function BleTestScreen() {
           if (char && char.value) {
             const rawStepData = atob(char.value);
             addLog(`Received Step Data (raw): ${rawStepData}`);
-            setStepCount(rawStepData);
+            setDistance(rawStepData);
           }
         });
       }).catch(err => addLog(`Error finding characteristics: ${err.message}`));
@@ -198,7 +198,7 @@ export default function BleTestScreen() {
         .finally(() => {
           setConnectedDevice(null);
           deviceRef.current = null;
-          setStepCount("N/A");
+          setDistance("N/A");
         });
     } else {
       addLog("No device connected to disconnect.");
@@ -219,7 +219,7 @@ export default function BleTestScreen() {
         }
         setConnectedDevice(null);
         deviceRef.current = null;
-        setStepCount("N/A");
+        setDistance("N/A");
         // 必要であれば再接続処理などをここに追加
       }
     );
@@ -233,7 +233,7 @@ export default function BleTestScreen() {
         <Text style={styles.title}>BLE Communication Test</Text>
         <View style={styles.statusContainer}>
           <Text>Status: {connectedDevice ? `Connected to ${connectedDevice.name || connectedDevice.id}` : "Disconnected"}</Text>
-          <Text>Step Count: {stepCount}</Text>
+          <Text>Distance: {Distance}</Text>
         </View>
         <View style={styles.buttonContainer}>
           <Button title="Start Scan" onPress={startScan} disabled={!!connectedDevice} />
