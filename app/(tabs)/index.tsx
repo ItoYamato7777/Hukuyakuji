@@ -1,250 +1,294 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Button,
+  ActivityIndicator,
   PermissionsAndroid,
-  Platform, // Log表示用にScrollViewを追加
-  SafeAreaView, // Buttonコンポーネントを追加
-  ScrollView,
+  Platform,
+  Pressable,
+  SafeAreaView,
   StyleSheet,
   Text,
-  View,
-} from "react-native";
-import { BleManager, Device } from "react-native-ble-plx";
-import { atob } from "react-native-quick-base64";
+  View
+} from 'react-native';
+import { BleManager, Device, Subscription } from 'react-native-ble-plx';
 
 // BleManagerのインスタンスはコンポーネント外で作成
 const bleManager = new BleManager();
 
-// ターゲットデバイス名とUUID（実際の値に置き換えてください）
+// ターゲットデバイス名（実際の名前に置き換えてください）
+// この値は設定ファイルやContext API経由で管理することも可能です。
 const TARGET_DEVICE_NAME = "Hukuyakuji";
-const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914a"; //
-const STEP_DATA_CHAR_UUID = "beefcafe-36e1-4688-b7f5-00000000000c"; //
 
-// AndroidのBluetooth権限要求関数
-async function requestBluetoothPermissions() {
+// AndroidのBluetooth権限要求関数 (Android 12対応)
+async function requestBluetoothPermissionsAndroid() {
   if (Platform.OS === 'android') {
+    const apiLevel = Platform.Version as number;
     try {
-      const coarseLocationGranted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-        {
-          title: "Location Permission for BLE",
-          message: "App needs location permission to scan for Bluetooth devices.",
-          buttonPositive: "OK",
-        }
-      );
-      // Android 12 (API 31) 以降で必要な権限
-      const scanGranted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-        {
-          title: "Bluetooth Scan Permission",
-          message: "App needs permission to scan for Bluetooth devices.",
-          buttonPositive: "OK",
-        }
-      );
-      const connectGranted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-        {
-          title: "Bluetooth Connect Permission",
-          message: "App needs permission to connect to Bluetooth devices.",
-          buttonPositive: "OK",
-        }
-      );
-
-      const allPermissionsGranted =
-        coarseLocationGranted === PermissionsAndroid.RESULTS.GRANTED &&
-        scanGranted === PermissionsAndroid.RESULTS.GRANTED &&
-        connectGranted === PermissionsAndroid.RESULTS.GRANTED;
-
-      if (allPermissionsGranted) {
-        console.log("[Permissions] All Bluetooth permissions granted.");
-        return true;
-      } else {
-        console.log("[Permissions] Some Bluetooth permissions were denied.");
-        return false;
+      if (apiLevel < 31) { // Android 11 (API 30) 以前
+        const coarseLocationGranted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION, // または ACCESS_FINE_LOCATION
+          {
+            title: "位置情報権限（Bluetoothスキャン用）",
+            message: "Bluetoothデバイスをスキャンするために位置情報権限が必要です。",
+            buttonPositive: "OK",
+          }
+        );
+        return coarseLocationGranted === PermissionsAndroid.RESULTS.GRANTED;
+      } else { // Android 12 (API 31) 以降
+        const permissions = [
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          // ACCESS_FINE_LOCATION は、Bluetoothスキャンで物理的な場所を取得しない場合は不要なことがあります。
+          // 必要に応じて追加・削除してください。
+          // PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        ];
+        const granted = await PermissionsAndroid.requestMultiple(permissions);
+        const allPermissionsGranted = Object.values(granted).every(
+          (status) => status === PermissionsAndroid.RESULTS.GRANTED
+        );
+        return allPermissionsGranted;
       }
     } catch (err) {
-      console.warn("[Permissions] Error requesting permissions:", err);
+      console.warn("[Permissions Error]", err);
       return false;
     }
   }
-  // iOSの場合はInfo.plistでの設定が主
-  return true;
+  return true; // iOSの場合はInfo.plistでの設定が主
 }
 
-export default function BleTestScreen() {
-  const [logs, setLogs] = useState<string[]>([]);
+
+export default function BluetoothConnectionScreen() {
+  const router = useRouter();
   const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
-  const [Distance, setDistance] = useState<string | number>("N/A");
+  const [isScanning, setIsScanning] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("おみくじ箱に接続してください");
+  // 'idle', 'permission_denied', 'scanning', 'connecting', 'connected', 'error'
+  const [connectionPhase, setConnectionPhase] = useState<'idle' | 'permission_denied' | 'scanning' | 'connecting' | 'connected' | 'error'>('idle');
 
   const deviceRef = useRef<Device | null>(null);
+  const disconnectSubscriptionRef = useRef<Subscription | null>(null);
 
-  // ログ追加関数
-  const addLog = (message: string) => {
-    console.log(message);
-    setLogs((prevLogs) => [
-      `${new Date().toLocaleTimeString()}: ${message}`,
-      ...prevLogs.slice(0, 100), // ログは最新100件まで保持
-    ]);
-  };
+  const addLog = useCallback((message: string) => { // 開発中のデバッグ用
+    console.log(`[BLE Status] ${new Date().toLocaleTimeString()}: ${message}`);
+  }, []);
 
   // BLE初期化と権限要求
   useEffect(() => {
-    addLog("Initializing BLE...");
-    requestBluetoothPermissions().then((granted) => {
-      if (granted) {
-        addLog("Bluetooth permissions granted. Ready to scan.");
+    const initialize = async () => {
+      const permissionsGranted = await requestBluetoothPermissionsAndroid();
+      if (permissionsGranted) {
+        addLog("Bluetooth権限が許可されました。");
+        setConnectionPhase('idle');
+        setStatusMessage("おみくじ箱に接続してください");
       } else {
-        addLog("Bluetooth permissions denied.");
+        addLog("Bluetooth権限が拒否されました。");
+        setConnectionPhase('permission_denied');
+        setStatusMessage("Bluetoothの権限がありません。\n設定アプリから権限を許可してください。");
       }
-    });
-
-    // コンポーネントのアンマウント時にBLEリソースをクリーンアップ
-    return () => {
-      addLog("Cleaning up BLE resources...");
-      bleManager.stopDeviceScan();
-      if (deviceRef.current) {
-        deviceRef.current.cancelConnection().catch(err => addLog(`Error cancelling connection: ${err}`));
-      }
-      // bleManager.destroy(); // アプリ全体でBleManagerが不要になった時点で呼び出す
     };
-  }, []);
+    initialize();
 
-  // デバイススキャン開始
-  const startScan = () => {
-    addLog("Starting device scan...");
+    // アンマウント時のクリーンアップ
+    return () => {
+      addLog("Bluetooth接続画面を離れます。スキャンを停止し、可能な場合は接続を解除します。");
+      bleManager.stopDeviceScan();
+      if (disconnectSubscriptionRef.current) {
+        disconnectSubscriptionRef.current.remove();
+      }
+      // この画面を離れる際に常に切断するかどうかは要件による
+      // if (deviceRef.current && deviceRef.current.isConnected()) {
+      //   deviceRef.current.cancelConnection().catch(err => addLog(`自動切断エラー: ${err.message}`));
+      // }
+    };
+  }, [addLog]);
+
+  // デバイス切断時のイベントリスナー設定
+  useEffect(() => {
+    if (connectedDevice) {
+      disconnectSubscriptionRef.current = bleManager.onDeviceDisconnected(
+        connectedDevice.id,
+        (error, disconnectedDev) => {
+          addLog(`デバイス「${disconnectedDev?.name || disconnectedDev?.id}」が切断されました。${error ? `エラー: ${error.message}` : ''}`);
+          setConnectedDevice(null);
+          deviceRef.current = null;
+          setIsConnecting(false);
+          setConnectionPhase('idle');
+          setStatusMessage("接続が切れました。再度接続してください。");
+        }
+      );
+    }
+    return () => {
+      if (disconnectSubscriptionRef.current) {
+        disconnectSubscriptionRef.current.remove();
+      }
+    };
+  }, [connectedDevice, addLog]);
+
+
+  const startScanAndConnect = () => {
+    if (isScanning || isConnecting) return;
+
+    addLog("デバイススキャンを開始...");
+    setIsScanning(true);
+    setConnectionPhase('scanning');
+    setStatusMessage("おみくじ箱を探しています...");
+
     bleManager.startDeviceScan(null, null, (error, scannedDevice) => {
       if (error) {
-        addLog(`Scan Error: ${error.message}`);
+        addLog(`スキャンエラー: ${error.message}`);
         bleManager.stopDeviceScan();
+        setIsScanning(false);
+        setConnectionPhase('error');
+        setStatusMessage(`スキャンエラー: ${error.message}`);
         return;
       }
+
       if (scannedDevice) {
-        addLog(`Found device: ${scannedDevice.name || "Unknown"} (${scannedDevice.id})`);
+        addLog(`デバイス発見: ${scannedDevice.name || "Unknown"} (${scannedDevice.id})`);
         if (scannedDevice.name === TARGET_DEVICE_NAME) {
-          addLog(`Target device "${TARGET_DEVICE_NAME}" found. Stopping scan.`);
+          addLog(`ターゲットデバイス「${TARGET_DEVICE_NAME}」を発見。スキャンを停止します。`);
           bleManager.stopDeviceScan();
-          connectToDevice(scannedDevice);
+          setIsScanning(false);
+          connectToDeviceInternal(scannedDevice);
         }
       }
     });
+
+    // スキャンタイムアウト処理（例: 20秒）
+    setTimeout(() => {
+      if (isScanning && connectionPhase === 'scanning') { //  `isScanning` がtrueのままであればタイムアウトと判断
+        bleManager.stopDeviceScan();
+        setIsScanning(false);
+        addLog("スキャンタイムアウト。");
+        setConnectionPhase('idle'); // または 'error'
+        setStatusMessage("おみくじ箱が見つかりませんでした。\n再度お試しください。");
+      }
+    }, 20000);
   };
 
-  // デバイス接続処理
-  const connectToDevice = (device: Device) => {
-    addLog(`Connecting to ${device.name || device.id}...`);
-    deviceRef.current = device; // 接続試行前に参照を保存
-    device.connect()
-      .then((connectedDevice) => {
-        addLog(`Connected to ${connectedDevice.name || connectedDevice.id}. Discovering services...`);
-        setConnectedDevice(connectedDevice);
-        deviceRef.current = connectedDevice; // 接続成功後、最新の参照に更新
-        return connectedDevice.discoverAllServicesAndCharacteristics();
+  const connectToDeviceInternal = (deviceToConnect: Device) => {
+    addLog(`「${deviceToConnect.name || deviceToConnect.id}」に接続中...`);
+    setIsConnecting(true);
+    setConnectionPhase('connecting');
+    setStatusMessage(`「${deviceToConnect.name || 'おみくじ箱'}」に接続しています...`);
+    deviceRef.current = deviceToConnect;
+
+    deviceToConnect.connect({ autoConnect: false, requestMTU: 251 }) // MTUサイズはデバイスに合わせて調整
+      .then((connectedDev) => {
+        addLog(`「${connectedDev.name || connectedDev.id}」に接続成功。サービスを検索します...`);
+        // オプション: サービスとキャラクタリスティックの探索
+        // return connectedDev.discoverAllServicesAndCharacteristics();
+        //})
+        //.then((deviceWithServices) => {
+        //  addLog("サービスとキャラクタリスティックの探索完了。");
+        setConnectedDevice(connectedDev);
+        setIsConnecting(false);
+        setConnectionPhase('connected');
+        setStatusMessage(`「${connectedDev.name || 'おみくじ箱'}」に接続しました！`);
+        // TODO: 接続情報をグローバルステートに保存する (Context APIやZustand/Reduxなど)
+        // router.replace('/(tabs)/home'); // すぐに遷移せず、ユーザーに確認ボタンを押させるのも良い
       })
-      .then((deviceWithServices) => {
-        addLog("Services and characteristics discovered.");
-        // 特定のキャラクタリスティックを監視
-        monitorDistanceCharacteristic(deviceWithServices);
-      })
-      .catch((error) => {
-        addLog(`Connection Error: ${error.message}`);
-        setConnectedDevice(null);
-        deviceRef.current = null; // 接続失敗時は参照をクリア
+      .catch(error => {
+        addLog(`接続エラー (${deviceToConnect.name}): ${error.message}`);
+        deviceRef.current = null;
+        setIsConnecting(false);
+        setConnectionPhase('error');
+        setStatusMessage(`接続に失敗しました: ${error.message}`);
       });
   };
 
-  // キャラクタリスティック監視
-  const monitorDistanceCharacteristic = (device: Device) => {
-    addLog(`Looking for service: ${SERVICE_UUID}`);
-    device.services().then(services => {
-      const service = services.find(s => s.uuid === SERVICE_UUID);
-      if (!service) {
-        addLog(`Service ${SERVICE_UUID} not found.`);
-        return;
-      }
-      addLog(`Service ${SERVICE_UUID} found. Looking for characteristic: ${STEP_DATA_CHAR_UUID}`);
-      service.characteristics().then(characteristics => {
-        const characteristic = characteristics.find(c => c.uuid === STEP_DATA_CHAR_UUID);
-        if (!characteristic) {
-          addLog(`Characteristic ${STEP_DATA_CHAR_UUID} not found.`);
-          return;
-        }
-        addLog(`Characteristic ${STEP_DATA_CHAR_UUID} found. Monitoring...`);
-        characteristic.monitor((error, char) => {
-          if (error) {
-            addLog(`Monitor Error: ${error.message}`);
-            return;
-          }
-          if (char && char.value) {
-            const rawStepData = atob(char.value);
-            addLog(`Received Step Data (raw): ${rawStepData}`);
-            setDistance(rawStepData);
-          }
-        });
-      }).catch(err => addLog(`Error finding characteristics: ${err.message}`));
-    }).catch(err => addLog(`Error finding services: ${err.message}`));
-  };
-
-  // 切断処理
-  const disconnectDevice = () => {
+  const handleDisconnect = () => {
     if (connectedDevice) {
-      addLog(`Disconnecting from ${connectedDevice.name || connectedDevice.id}...`);
+      addLog(`「${connectedDevice.name || connectedDevice.id}」から切断します...`);
       connectedDevice.cancelConnection()
         .then(() => {
-          addLog("Disconnected successfully.");
+          addLog("切断成功。");
+          // setConnectedDevice(null) などは onDeviceDisconnected で処理される
         })
-        .catch((error) => {
-          addLog(`Disconnection Error: ${error.message}`);
-        })
-        .finally(() => {
+        .catch(error => {
+          addLog(`切断エラー: ${error.message}`);
+          // 強制的に状態を更新
           setConnectedDevice(null);
           deviceRef.current = null;
-          setDistance("N/A");
+          setIsConnecting(false);
+          setConnectionPhase('idle');
+          setStatusMessage("切断処理中にエラーが発生しました。");
         });
-    } else {
-      addLog("No device connected to disconnect.");
     }
   };
 
-  // デバイス切断時のイベントリスナー
-  useEffect(() => {
-    if (!connectedDevice) return;
+  const navigateToHome = () => {
+    if (isScanning) { // スキャン中にスキップする場合は停止
+      bleManager.stopDeviceScan();
+      setIsScanning(false);
+    }
+    router.replace('/(tabs)/home');
+  };
 
-    const subscription = bleManager.onDeviceDisconnected(
-      connectedDevice.id,
-      (error, device) => {
-        if (error) {
-          addLog(`Device disconnected with error: ${error.message}`);
-        } else {
-          addLog(`Device ${device?.name || device?.id} disconnected.`);
-        }
-        setConnectedDevice(null);
-        deviceRef.current = null;
-        setDistance("N/A");
-        // 必要であれば再接続処理などをここに追加
-      }
-    );
-    return () => subscription.remove();
-  }, [connectedDevice]);
-
+  const getIndicatorStyle = () => {
+    const style = [styles.statusIndicator];
+    switch (connectionPhase) {
+      case 'idle':
+      case 'permission_denied':
+        style.push({ backgroundColor: '#E0E0E0' }); // ライトグレー
+        break;
+      case 'scanning':
+        style.push({ backgroundColor: '#FFD700' }); // ゴールド（アニメーションで点滅させると良い）
+        break;
+      case 'connecting':
+        style.push({ backgroundColor: '#FFA500' }); // オレンジ
+        break;
+      case 'connected':
+        style.push({ backgroundColor: '#4CAF50' }); // 緑
+        break;
+      case 'error':
+        style.push({ backgroundColor: '#F44336' }); // 赤
+        break;
+    }
+    return style;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <Text style={styles.title}>BLE Communication Test</Text>
-        <View style={styles.statusContainer}>
-          <Text>Status: {connectedDevice ? `Connected to ${connectedDevice.name || connectedDevice.id}` : "Disconnected"}</Text>
-          <Text>Distance: {Distance}</Text>
-        </View>
-        <View style={styles.buttonContainer}>
-          <Button title="Start Scan" onPress={startScan} disabled={!!connectedDevice} />
-          <Button title="Disconnect" onPress={disconnectDevice} disabled={!connectedDevice} />
-        </View>
-        <Text style={styles.logTitle}>Logs:</Text>
-        <ScrollView style={styles.logContainer} contentContainerStyle={styles.logContentContainer}>
-          {logs.map((log, index) => (
-            <Text key={index} style={styles.logText}>{log}</Text>
-          ))}
-        </ScrollView>
+        <Text style={styles.appTitle}>薬×おみくじ箱</Text>
+        {/* アプリのロゴやイラストを配置するスペース */}
+        {/* <Image source={require('@/assets/images/app-logo.png')} style={styles.logo} /> */}
+
+        <View style={getIndicatorStyle()} />
+        <Text style={styles.statusMessageText}>{statusMessage}</Text>
+
+        {isScanning || isConnecting ? (
+          <ActivityIndicator size="large" color="#007AFF" style={styles.activityIndicator} />
+        ) : null}
+
+        {connectionPhase === 'connected' && connectedDevice ? (
+          <View style={styles.buttonGroup}>
+            <Pressable style={[styles.buttonBase, styles.primaryButton]} onPress={navigateToHome}>
+              <Text style={styles.buttonText}>ホームへ進む</Text>
+            </Pressable>
+            <Pressable style={[styles.buttonBase, styles.secondaryButton, { marginTop: 15 }]} onPress={handleDisconnect}>
+              <Text style={[styles.buttonText, styles.secondaryButtonText]}>「{connectedDevice.name || TARGET_DEVICE_NAME}」から切断</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.buttonGroup}>
+            <Pressable
+              style={[styles.buttonBase, styles.primaryButton]}
+              onPress={startScanAndConnect}
+              disabled={isScanning || isConnecting || connectionPhase === 'permission_denied'}>
+              <Text style={styles.buttonText}>おみくじ箱に接続する</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.buttonBase, styles.secondaryButton, { marginTop: 15 }]}
+              onPress={navigateToHome}
+              disabled={isConnecting} // 接続試行中はスキップさせないなどの判断
+            >
+              <Text style={[styles.buttonText, styles.secondaryButtonText]}>接続せずに続ける</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -253,47 +297,85 @@ export default function BleTestScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#F0F2F5', // 少し明るい背景色
   },
   container: {
     flex: 1,
-    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 20,
+  appTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 30, // ロゴやイラストのスペースを考慮
+    textAlign: 'center',
   },
-  statusContainer: {
-    marginBottom: 20,
-    padding: 10,
-    backgroundColor: '#fff',
-    borderRadius: 5,
+  // logo: { width: 150, height: 150, resizeMode: 'contain', marginBottom: 30 },
+  statusIndicator: {
+    width: 120,
+    height: 120,
+    borderRadius: 60, // 円形
+    marginBottom: 25,
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.5)', // 少し透明な白で縁取り
+    // iOS Shadow
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.23,
+    shadowRadius: 2.62,
+    // Android Shadow
+    elevation: 4,
   },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 20,
-  },
-  logTitle: {
+  statusMessageText: {
     fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 10,
+    color: '#555555',
+    textAlign: 'center',
+    minHeight: 40, // 2行表示になってもレイアウトが崩れないように
+    marginBottom: 30,
   },
-  logContainer: {
-    flex: 1,
-    backgroundColor: "#333",
-    padding: 10,
-    borderRadius: 5,
+  activityIndicator: {
+    marginBottom: 20,
   },
-  logContentContainer: {
-    paddingBottom: 10,
+  buttonGroup: {
+    width: '90%',
+    maxWidth: 350, // あまり横に広がりすぎないように
   },
-  logText: {
-    fontSize: 10,
-    color: "#fff",
-    fontFamily: Platform.OS === "ios" ? "Courier New" : "monospace", // 等幅フォントで見やすく
-    marginBottom: 5,
+  buttonBase: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 25, // 角を丸くして柔らかい印象に
+    alignItems: 'center',
+    justifyContent: 'center',
+    // iOS Shadow
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    // Android Shadow
+    elevation: 3,
+  },
+  primaryButton: {
+    backgroundColor: '#007AFF', // iOS標準ブルー
+  },
+  secondaryButton: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#007AFF',
+    borderWidth: 1,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButtonText: {
+    color: '#007AFF',
   },
 });
