@@ -25,8 +25,8 @@ interface MedicationRecord {
 }
 
 // 仮のサービスUUIDとキャラクタリスティックUUID (実際のデバイスに合わせてください)
-// const OMOKUJI_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914a"; // app/(tabs)/index.tsx から
-// const OMIKUJI_CHARACTERISTIC_UUID = "beefcafe-36e1-4688-b7f5-00000000000c"; // STEP_DATA_CHAR_UUID に相当するもの
+const OMOKUJI_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914a"; // app/(tabs)/index.tsx から
+const OMIKUJI_CHARACTERISTIC_UUID = "beefcafe-36e1-4688-b7f5-00000000000c"; // STEP_DATA_CHAR_UUID に相当するもの
 
 export default function RecordScreen() {
   // const { connectedDevice, bleManager } = useBleContext(); // BLE Contextから取得 (仮)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Animated, Image, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 // import { useRouter } from 'expo-router'; // 他のタブへの遷移はTabNavigatorが担うので基本不要
 
@@ -40,30 +40,30 @@ export default function HomeScreen() {
     const [showGreeting, setShowGreeting] = useState(false);
 
     // キャラクターアニメーション用 (例: 左右に揺れる)
-    const揺れアニメーション = useRef(new Animated.Value(0)).current;
+    const animation = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         // 揺れるアニメーションを開始
         Animated.loop(
             Animated.sequence([
-                Animated.timing(揺れアニメーション, {
+                Animated.timing(animation, {
                     toValue: 1,
                     duration: 1500,
                     useNativeDriver: true,
                 }),
-                Animated.timing(揺れアニメーション, {
+                Animated.timing(animation, {
                     toValue: -1,
                     duration: 1500,
                     useNativeDriver: true,
                 }),
-                Animated.timing(揺れアニメーション, {
+                Animated.timing(animation, {
                     toValue: 0,
                     duration: 1500,
                     useNativeDriver: true,
                 }),
             ])
         ).start();
-    }, [揺れアニメーション]);
+    }, [animation]);
 
     const handleCharacterPress = () => {
         setShowGreeting(true);
@@ -109,7 +109,7 @@ export default function HomeScreen() {
                 <Pressable onPress={handleCharacterPress} style={styles.characterPressable}>
                     <Animated.View style={{
                         transform: [{
-                            translateX: 揺れアニメーション.interpolate({
+                            translateX: animation.interpolate({
                                 inputRange: [-1, 1],
                                 outputRange: [-10, 10] // 揺れの幅
                             })
