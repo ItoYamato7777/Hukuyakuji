@@ -9,134 +9,83 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-// import { BleManager, Device, Characteristic } from 'react-native-ble-plx'; // BLE関連の型定義
-// import { useBleContext } from '@/context/BleContext'; // BLE状態をContextから取得 (仮)
-// import { useCharacterContext } from '@/context/CharacterContext'; // キャラクター情報をContextから取得・更新 (仮)
+import { useBle } from '@/context/BleContext'; // BleContextを使用
 
-// 仮の型定義
+// 仮の型定義 (変更なし)
 interface MedicationRecord {
   id: string;
-  type: 'regular' | 'single'; // 常備薬か単発薬か
+  type: 'regular' | 'single';
   medicationName: string;
   timestamp: Date;
-  omikujiResult?: '大吉' | '吉' | '小吉' | '凶' | null; // おみくじ結果
+  omikujiResult?: '大吉' | '吉' | '小吉' | '凶' | null;
   pointsEarned?: number;
   notes?: string;
 }
 
-// 仮のサービスUUIDとキャラクタリスティックUUID (実際のデバイスに合わせてください)
-const OMOKUJI_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914a"; // app/(tabs)/index.tsx から
-const OMIKUJI_CHARACTERISTIC_UUID = "beefcafe-36e1-4688-b7f5-00000000000c"; // STEP_DATA_CHAR_UUID に相当するもの
-
 export default function RecordScreen() {
-  // const { connectedDevice, bleManager } = useBleContext(); // BLE Contextから取得 (仮)
-  // const { character, updateCharacterExperience } = useCharacterContext(); // Character Contextから取得 (仮)
+  const { connectedDevice, showShakePopup, setOmikujiTrigger } = useBle(); // Contextから必要なものを取得
 
-  const [isOmikujiInProgress, setIsOmikujiInProgress] = useState(false);
+  // おみくじ関連のローカルState (結果表示用など)
   const [omikujiStatusMessage, setOmikujiStatusMessage] = useState('');
   const [lastOmikujiResult, setLastOmikujiResult] = useState<Partial<MedicationRecord> | null>(null);
+  const [isOmikujiInProgress, setIsOmikujiInProgress] = useState(false); // 処理中フラグ
 
+  // 単発薬関連のState (変更なし)
   const [singleMedicationName, setSingleMedicationName] = useState('');
   const [singleMedicationNotes, setSingleMedicationNotes] = useState('');
-
   const [medicationHistory, setMedicationHistory] = useState<MedicationRecord[]>([]);
 
-  // 開発用にBLE関連の処理を模倣するための仮の接続状態
-  const [mockIsDeviceConnected, setMockIsDeviceConnected] = useState(true); // BLE接続画面からの連携を想定
-
-  // BLEキャラクタリスティック監視のセットアップ (仮)
-  // useEffect(() => {
-  //   if (connectedDevice && bleManager) {
-  //     const monitorOmikujiCharacteristic = async () => {
-  //       try {
-  //         await bleManager.monitorCharacteristicForDevice(
-  //           connectedDevice.id,
-  //           OMOKUJI_SERVICE_UUID,
-  //           OMIKUJI_CHARACTERISTIC_UUID,
-  //           (error, characteristic) => {
-  //             if (error) {
-  //               console.error("Monitor Error:", error.message);
-  //               setOmikujiStatusMessage(`エラー: ${error.message}`);
-  //               setIsOmikujiInProgress(false);
-  //               return;
-  //             }
-  //             if (characteristic?.value) {
-  //               // Base64デコードやデータ形式のパースはデバイスの仕様に合わせる
-  //               // const rawData = atob(characteristic.value); // app/(tabs)/index.tsx での例
-  //               // console.log("Received Omikuji Data (raw):", rawData);
-  //               // const parsedResult = parseOmikujiData(rawData); // 独自のパーサー関数
-  //               // processOmikujiResult(parsedResult);
-  //
-  //               // --- 以下はBLEデータ受信成功時の仮処理 ---
-  //               const medicationNameFromDevice = "お薬A"; // デバイスから薬の名前を取得 (仮)
-  //               const results = ['大吉', '吉', '小吉', '凶'] as const;
-  //               const randomResult = results[Math.floor(Math.random() * results.length)];
-  //               const points = randomResult === '大吉' ? 5 : randomResult === '吉' ? 3 : 1;
-  //               processOmikujiResult({ medicationName: medicationNameFromDevice, result: randomResult, points });
-  //               // --- 仮処理ここまで ---
-  //             }
-  //           }
-  //         );
-  //         console.log("おみくじキャラクタリスティックの監視を開始しました。");
-  //       } catch (error) {
-  //         console.error("Failed to monitor characteristic:", error);
-  //         setOmikujiStatusMessage("おみくじ機能の準備に失敗しました。");
-  //       }
-  //     };
-  //     monitorOmikujiCharacteristic();
-  //     return () => {
-  //       // bleManager.cancelCharacteristicMonitoring(connectedDevice.id, OMOKUJI_SERVICE_UUID, OMIKUJI_CHARACTERISTIC_UUID);
-  //       console.log("おみくじキャラクタリスティックの監視を停止しました。");
-  //     };
-  //   }
-  // }, [connectedDevice, bleManager]);
-
-
-  const handleStartOmikuji = useCallback(() => {
-    if (!mockIsDeviceConnected) { // 本来は `!connectedDevice`
-      Alert.alert("エラー", "おみくじ箱が接続されていません。\n接続画面で接続してください。");
+  // --- おみくじ処理関数 ---
+  const executeOmikuji = useCallback(() => {
+    if (!connectedDevice) { // BLE接続がない場合は何もしない（ポップアップ自体表示されないはずだが念のため）
+      Alert.alert("エラー", "おみくじ箱が接続されていません。");
+      setOmikujiStatusMessage("エラー: デバイス未接続");
       return;
     }
-    if (isOmikujiInProgress) return;
+    if (isOmikujiInProgress) return; // 多重実行防止
 
     setIsOmikujiInProgress(true);
-    setOmikujiStatusMessage("おみくじ箱を振ってください...");
+    setOmikujiStatusMessage("おみくじ結果を生成中...");
     setLastOmikujiResult(null);
 
-    // --- BLE連携がない場合の仮のタイマー処理 ---
-    // 実際のBLE連携では、このタイマーは不要で、デバイスからの通知を待ちます。
-    setTimeout(() => {
-      if (!isOmikujiInProgress) return; // 他の処理で既に完了または中止されている場合
-      const medicationNameFromDevice = "いつものお薬"; // 仮の薬名
-      const results = ['大吉', '吉', '小吉', '凶'] as const;
-      const randomResult = results[Math.floor(Math.random() * results.length)];
-      const points = randomResult === '大吉' ? 5 : randomResult === '吉' ? 3 : 1;
-      processOmikujiResult({ medicationName: medicationNameFromDevice, result: randomResult, points });
-    }, 3000); // 3秒後に結果を模倣
-    // --- 仮のタイマー処理ここまで ---
+    // ここで実際のおみくじ結果生成ロジック（以前のsetTimeoutの部分をベースに）
+    // setTimeoutはデモ用。実際にはすぐに結果を生成してよい。
+    const medicationNameFromDevice = "いつものお薬"; // 仮の薬名
+    const results = ['大吉', '吉', '小吉', '凶'] as const;
+    const randomResult = results[Math.floor(Math.random() * results.length)];
+    const points = randomResult === '大吉' ? 5 : randomResult === '吉' ? 3 : 1;
 
-    // TODO: 実際にBLEデバイスに「おみくじ開始」を通知する必要があれば、ここに書き込み処理を追加
-  }, [mockIsDeviceConnected, isOmikujiInProgress]);
-
-
-  const processOmikujiResult = useCallback(({ medicationName, result, points }: { medicationName: string, result: '大吉' | '吉' | '小吉' | '凶', points: number }) => {
-    setOmikujiStatusMessage(`結果: ${medicationName} - ${result}！ (${points}ポイント獲得)`);
     const newRecord: MedicationRecord = {
       id: Date.now().toString(),
       type: 'regular',
-      medicationName: medicationName,
+      medicationName: medicationNameFromDevice,
       timestamp: new Date(),
-      omikujiResult: result,
+      omikujiResult: randomResult,
       pointsEarned: points,
     };
+
+    setOmikujiStatusMessage(`結果: ${medicationNameFromDevice} - ${randomResult}！ (${points}ポイント獲得)`);
     setLastOmikujiResult(newRecord);
-    setMedicationHistory(prev => [newRecord, ...prev]);
-    // updateCharacterExperience(points); // キャラクターの経験値を更新 (Context経由)
+    setMedicationHistory(prev => [newRecord, ...prev.slice(0, 19)]); // 履歴は最新20件までなど調整
+    // updateCharacterExperience(points); // キャラクターの経験値を更新 (Context経由または別方法で)
     console.log(`${points}ポイント獲得。キャラクター経験値更新処理（仮）`);
     setIsOmikujiInProgress(false);
-  }, []);
+
+  }, [connectedDevice, isOmikujiInProgress]);
 
 
+  // --- BleContextにおみくじ処理のトリガーを登録 ---
+  useEffect(() => {
+    // RecordScreenが表示されている間、おみくじトリガーとしてexecuteOmikujiをセット
+    setOmikujiTrigger(() => executeOmikuji);
+    // クリーンアップ関数で、画面離脱時にトリガーを解除（nullをセット）
+    return () => {
+      setOmikujiTrigger(null);
+    };
+  }, [setOmikujiTrigger, executeOmikuji]);
+
+
+  // 単発薬記録処理 (変更なし)
   const handleRecordSingleMedication = useCallback(() => {
     if (!singleMedicationName.trim()) {
       Alert.alert("入力エラー", "薬の名前を入力してください。");
@@ -148,31 +97,43 @@ export default function RecordScreen() {
       medicationName: singleMedicationName.trim(),
       timestamp: new Date(),
       notes: singleMedicationNotes.trim(),
-      pointsEarned: 1, // 単発薬でも固定ポイント
+      pointsEarned: 1,
     };
-    setMedicationHistory(prev => [newRecord, ...prev]);
-    // updateCharacterExperience(1); // キャラクターの経験値を更新 (Context経由)
+    setMedicationHistory(prev => [newRecord, ...prev.slice(0, 19)]);
     console.log(`単発薬「${newRecord.medicationName}」を記録。1ポイント獲得（仮）`);
     setSingleMedicationName('');
     setSingleMedicationNotes('');
     Alert.alert("記録完了", `${newRecord.medicationName}を記録しました。`);
   }, [singleMedicationName, singleMedicationNotes]);
 
+
+  // --- UI レンダリング ---
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>常備薬の記録（おみくじ）</Text>
-          <Pressable
-            style={[styles.buttonBase, styles.omikujiButton, isOmikujiInProgress && styles.buttonDisabled]}
-            onPress={handleStartOmikuji}
-            disabled={isOmikujiInProgress}>
+          {!connectedDevice && (
+            <Text style={styles.bleDisconnectedMessage}>
+              おみくじ箱が接続されていません。ホーム画面で接続してください。
+            </Text>
+          )}
+          {connectedDevice && (
+            <Text style={styles.infoMessage}>
+              おみくじ箱を振るとお薬を記録できます。
+            </Text>
+          )}
+          {/* おみくじを引くボタンは不要になる (シェイクで起動のため) */}
+          {/* <Pressable
+            style={[styles.buttonBase, styles.omikujiButton, (!connectedDevice || isOmikujiInProgress) && styles.buttonDisabled]}
+            onPress={handleStartOmikuji} // この関数は削除または役割変更
+            disabled={!connectedDevice || isOmikujiInProgress}>
             <Text style={styles.buttonText}>{isOmikujiInProgress ? "おみくじ実行中..." : "おみくじを引く"}</Text>
-          </Pressable>
+          </Pressable> */}
           {omikujiStatusMessage ? <Text style={styles.statusMessage}>{omikujiStatusMessage}</Text> : null}
           {lastOmikujiResult && (
             <View style={styles.resultCard}>
-              <Text style={styles.resultTitle}>おみくじ結果</Text>
+              <Text style={styles.resultTitle}>今回のおみくじ結果</Text>
               <Text>薬の名前: {lastOmikujiResult.medicationName}</Text>
               <Text>結果: {lastOmikujiResult.omikujiResult}</Text>
               <Text>獲得ポイント: {lastOmikujiResult.pointsEarned}</Text>
@@ -184,6 +145,7 @@ export default function RecordScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>単発薬の記録</Text>
+          {/* ... (単発薬の入力フォームとボタンは変更なし) ... */}
           <TextInput
             style={styles.input}
             placeholder="薬の名前"
@@ -208,10 +170,11 @@ export default function RecordScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>最近の記録</Text>
+          {/* ... (履歴表示部分は変更なし) ... */}
           {medicationHistory.length === 0 ? (
             <Text style={styles.noHistoryText}>まだ記録がありません。</Text>
           ) : (
-            medicationHistory.slice(0, 5).map(record => ( // 最新5件を表示
+            medicationHistory.slice(0, 5).map(record => (
               <View key={record.id} style={styles.historyItem}>
                 <Text style={styles.historyDate}>{new Date(record.timestamp).toLocaleString('ja-JP')}</Text>
                 <Text style={styles.historyName}>{record.medicationName} ({record.type === 'regular' ? '常備薬' : '単発薬'})</Text>
@@ -226,7 +189,9 @@ export default function RecordScreen() {
   );
 }
 
+// スタイル (一部追加・変更)
 const styles = StyleSheet.create({
+  // ... (既存のsafeArea, container, section, sectionTitle, input, textArea, buttonBase, recordButton, buttonText, divider, noHistoryText, historyItem, historyDate, historyName, historyNotes)
   safeArea: {
     flex: 1,
     backgroundColor: '#F0F2F5',
@@ -239,12 +204,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
     padding: 15,
-    // iOS Shadow
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.18,
     shadowRadius: 1.00,
-    // Android Shadow
     elevation: 1,
   },
   sectionTitle: {
@@ -253,35 +216,25 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: '#333',
   },
-  buttonBase: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
+  bleDisconnectedMessage: { // 追加
+    fontSize: 14,
+    color: '#777',
+    textAlign: 'center',
     marginBottom: 10,
-    // iOS Shadow
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1, },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
-    // Android Shadow
-    elevation: 3,
+    paddingHorizontal: 10,
   },
-  omikujiButton: {
-    backgroundColor: '#FF6347', // トマト色
+  infoMessage: { // 追加
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 15,
   },
-  recordButton: {
-    backgroundColor: '#1E90FF', // ドジャーブルー
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    backgroundColor: '#AAAAAA',
-  },
+  // omikujiButton: { // 不要になったのでコメントアウトまたは削除
+  //   backgroundColor: '#FF6347',
+  // },
+  // buttonDisabled: {
+  //   backgroundColor: '#AAAAAA',
+  // },
   statusMessage: {
     marginTop: 10,
     fontSize: 14,
@@ -313,7 +266,7 @@ const styles = StyleSheet.create({
   },
   textArea: {
     minHeight: 80,
-    textAlignVertical: 'top', // Androidでテキストを上揃えに
+    textAlignVertical: 'top',
   },
   divider: {
     height: 1,
@@ -347,5 +300,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#555',
     marginTop: 3,
+  },
+  buttonBase: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1, },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    elevation: 3,
+  },
+  recordButton: {
+    backgroundColor: '#1E90FF',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -7,21 +7,22 @@ import { Modal, View, Text, Pressable, StyleSheet } from 'react-native'; // Moda
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { BleProvider, useBle } from '@/context/BleContext'; // 作成したBleProviderとuseBleをインポート
+import { useBle } from '@/context/BleContext'; // useBleのインポートを確認
 
 // グローバルポップアップコンポーネント
 const GlobalShakePopup = () => {
-  const { showShakePopup, closeShakePopup } = useBle();
+  const { showShakePopup, closeShakePopup } = useBle(); // closeShakePopup を取得
 
   if (!showShakePopup) {
     return null;
   }
 
-  const handleCloseAndOmikuji = () => {
+  // ポップアップのOKボタンが押されたら、BleContextのcloseShakePopupを呼び出す
+  // これにより、Context内で登録されたおみくuji処理がトリガーされる
+  const handlePopupConfirm = () => {
     closeShakePopup();
-    // TODO: ここでおみくじ処理を実行するナビゲーションや関数呼び出しを行う
-    // 例: router.push('/record?action=drawOmikuji'); または特定の関数を呼び出す
-    Alert.alert("ポップアップ後処理", "ここでおみくじ画面に遷移したり、結果処理を開始します。");
+    // 以前ここにあったAlertは、closeShakePopup内部のtriggerOmikuji実行後に
+    // 実際の処理がされるので、ここでは不要。
   };
 
   return (
@@ -29,7 +30,7 @@ const GlobalShakePopup = () => {
       transparent={true}
       animationType="fade"
       visible={showShakePopup}
-      onRequestClose={closeShakePopup} // Androidの戻るボタン対応
+      onRequestClose={handlePopupConfirm} // Androidの戻るボタンでも同様の処理
     >
       <View style={popupStyles.centeredView}>
         <View style={popupStyles.modalView}>
@@ -37,7 +38,7 @@ const GlobalShakePopup = () => {
           <Text style={popupStyles.modalText}>おみくじが振られました！！</Text>
           <Pressable
             style={[popupStyles.button, popupStyles.buttonClose]}
-            onPress={handleCloseAndOmikuji} // 将来的にはここでおみくじ処理へ
+            onPress={handlePopupConfirm}
           >
             <Text style={popupStyles.textStyle}>OK</Text>
           </Pressable>
