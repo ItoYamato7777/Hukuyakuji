@@ -14,7 +14,7 @@ import { PermissionsAndroid, Platform } from 'react-native'; // Alertはここ�
 import { BleError, BleManager, Characteristic, Device, Subscription } from 'react-native-ble-plx';
 
 // ターゲットデバイス情報 (ESP32側の設定に合わせる)
-const TARGET_DEVICE_NAME = "Hukumikuji";
+const TARGET_DEVICE_NAME = "Hukuyakuji";
 const OMOKUJI_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914a";
 const OMIKUJI_EVENT_CHARACTERISTIC_UUID = "beefcafe-36e1-4688-b7f5-00000000000c";
 
@@ -85,11 +85,7 @@ export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     const [connectionPhase, setConnectionPhase] = useState<'idle' | 'permission_denied' | 'scanning' | 'connecting' | 'connected' | 'error' | 'initializing'>('initializing');
     const [statusMessage, setStatusMessage] = useState("BLE機能を初期化中...");
     const [showShakePopup, setShowShakePopup] = useState(false);
-
-    // ▼▼▼ エラー箇所 ▼▼▼
-    // この triggerOmikuji と setTriggerOmikuji が宣言されていないためエラーになっているはずです。
     const [triggerOmikuji, setTriggerOmikuji] = useState<(() => void) | null>(null);
-    // ▲▲▲ エラー箇所 ▲▲▲
 
     const deviceRef = useRef<Device | null>(null);
     const disconnectSubscriptionRef = useRef<Subscription | null>(null);

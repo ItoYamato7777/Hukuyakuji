@@ -2,27 +2,24 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react'; // Reactをインポート
-import { Modal, View, Text, Pressable, StyleSheet } from 'react-native'; // Modal関連をインポート
+import React, { useEffect } from 'react';
+import { Modal, View, Text, Pressable, StyleSheet, Alert } from 'react-native'; // Alertをインポート
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useBle } from '@/context/BleContext'; // useBleのインポートを確認
+import { BleProvider, useBle } from '@/context/BleContext';
+import { CharacterProvider } from '@/context/CharacterContext'; // 作成したCharacterProviderをインポート
 
-// グローバルポップアップコンポーネント
+// グローバルポップアップコンポーネント (変更なし、ただしAlertのインポートをファイル上部で確認)
 const GlobalShakePopup = () => {
-  const { showShakePopup, closeShakePopup } = useBle(); // closeShakePopup を取得
+  const { showShakePopup, closeShakePopup } = useBle();
 
   if (!showShakePopup) {
     return null;
   }
 
-  // ポップアップのOKボタンが押されたら、BleContextのcloseShakePopupを呼び出す
-  // これにより、Context内で登録されたおみくuji処理がトリガーされる
   const handlePopupConfirm = () => {
     closeShakePopup();
-    // 以前ここにあったAlertは、closeShakePopup内部のtriggerOmikuji実行後に
-    // 実際の処理がされるので、ここでは不要。
   };
 
   return (
@@ -30,7 +27,7 @@ const GlobalShakePopup = () => {
       transparent={true}
       animationType="fade"
       visible={showShakePopup}
-      onRequestClose={handlePopupConfirm} // Androidの戻るボタンでも同様の処理
+      onRequestClose={handlePopupConfirm}
     >
       <View style={popupStyles.centeredView}>
         <View style={popupStyles.modalView}>
@@ -68,25 +65,27 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <BleProvider> {/* BleProviderでラップ */}
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <GlobalShakePopup /> {/* グローバルポップアップを配置 */}
+      <BleProvider>
+        <CharacterProvider> {/* CharacterProviderでBleProviderの子要素をラップ */}
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <GlobalShakePopup />
+        </CharacterProvider>
       </BleProvider>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
   );
 }
 
-// ポップアップ用スタイル
+// ポップアップ用スタイル (変更なし)
 const popupStyles = StyleSheet.create({
   centeredView: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: 'rgba(0,0,0,0.5)', // 半透明の背景
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalView: {
     margin: 20,

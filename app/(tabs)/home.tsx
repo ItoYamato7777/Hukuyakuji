@@ -1,39 +1,18 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useBle } from '@/context/BleContext';
+import { useCharacter } from '@/context/CharacterContext'; // Character型もインポート
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Image,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-  ActivityIndicator,
+    ActivityIndicator,
+    Animated,
+    Image,
+    Pressable,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
-import { useBle } from '@/context/BleContext'; // BleContextからuseBleフックをインポート
 
-// キャラクターデータ型と初期データ (変更なし)
-interface CharacterData {
-    id: string;
-    name: string;
-    level: number;
-    experience: number;
-    maxExperience: number;
-    imageUri: any;
-    status: 'idle' | 'hungry' | 'waiting_med' | 'happy';
-    greeting: string;
-}
-
-const initialCharacterData: CharacterData = {
-    id: 'kamisama_001',
-    name: 'おくすり神',
-    level: 1,
-    experience: 30,
-    maxExperience: 100,
-    imageUri: require('@/assets/images/default_character.png'), // 画像パスはプロジェクトに合わせてください
-    status: 'idle',
-    greeting: 'こんにちは！お薬、ちゃんと飲んでるかな？',
-};
-
+// statusIconsはCharacterContext側で管理されても良いが、表示専用なのでこちらでもOK
 const statusIcons = {
     idle: '☀️',
     hungry: '🍲',
@@ -42,11 +21,7 @@ const statusIcons = {
 };
 
 export default function HomeScreen() {
-    const [character, setCharacter] = useState<CharacterData>(initialCharacterData);
-    const [showGreeting, setShowGreeting] = useState(false);
-    const animation = useRef(new Animated.Value(0)).current;
-
-    // --- BleContextからBLE関連の状態と関数を取得 ---
+    // BLE ContextからBLE関連の状態と関数を取得 (変更なし)
     const {
         connectedDevice,
         isScanning,
@@ -55,10 +30,15 @@ export default function HomeScreen() {
         statusMessage,
         startScan,
         disconnectDevice,
-        // requestPermissions, // requestPermissionsはContextの初期化時に実行されるため、ここでは通常不要
     } = useBle();
 
-    // --- キャラクターアニメーション (既存) ---
+    // Character Contextからキャラクター情報とローディング状態を取得
+    const { character, isLoading: isCharacterLoading } = useCharacter();
+
+    const [showGreeting, setShowGreeting] = useState(false); // 挨拶表示用のローカルState
+    const animation = useRef(new Animated.Value(0)).current; // アニメーション用のRef (変更なし)
+
+    // キャラクターアニメーション (変更なし)
     useEffect(() => {
         Animated.loop(
             Animated.sequence([
@@ -70,11 +50,16 @@ export default function HomeScreen() {
     }, [animation]);
 
     const handleCharacterPress = () => {
-        setShowGreeting(true);
-        setTimeout(() => setShowGreeting(false), 2000);
+        if (character) { // characterがnullでないことを確認
+            setShowGreeting(true);
+            setTimeout(() => setShowGreeting(false), 2000);
+        }
     };
 
-    const getExperiencePercentage = () => (character.experience / character.maxExperience) * 100;
+    const getExperiencePercentage = () => {
+        if (!character || character.maxExperience === 0) return 0; // characterやmaxExperienceが0の場合のガード
+        return (character.experience / character.maxExperience) * 100;
+    };
 
     const getBackgroundColor = () => {
         const hour = new Date().getHours();
@@ -84,30 +69,20 @@ export default function HomeScreen() {
         return bleStyles.backgroundNight;
     };
 
-    // --- BLE接続UIのレンダリング ---
+    // BLE接続UIのレンダリング (変更なし)
     const renderBleConnectionArea = () => {
-        // 権限要求はContextの初期化時に行われるので、ここではボタン表示を制御
-        // const handleRequestPermissions = async () => {
-        //   const granted = await requestPermissions();
-        //   if (granted) {
-        //     // 権限が付与された後の処理 (例: 自動スキャン開始など)
-        //   }
-        // };
-
         return (
             <View style={bleStyles.bleContainer}>
                 <View style={[bleStyles.statusIndicator, getIndicatorStyle()]} />
                 <Text style={bleStyles.statusMessageText} numberOfLines={2} ellipsizeMode="tail">{statusMessage}</Text>
-
-                {(isScanning || isConnecting) && ( // 接続中もインジケーター表示を考慮
+                {(isScanning || isConnecting) && (
                     <ActivityIndicator size="large" color="#007AFF" style={bleStyles.activityIndicator} />
                 )}
-
                 {connectionPhase === 'connected' && connectedDevice ? (
                     <Pressable style={[bleStyles.buttonBase, bleStyles.disconnectButton]} onPress={disconnectDevice}>
                         <Text style={[bleStyles.buttonText, bleStyles.disconnectButtonText]}>「{connectedDevice.name || "接続デバイス"}」から切断</Text>
                     </Pressable>
-                ) : connectionPhase !== 'initializing' && connectionPhase !== 'permission_denied' ? ( // 初期化中と権限拒否時以外に接続ボタン表示
+                ) : connectionPhase !== 'initializing' && connectionPhase !== 'permission_denied' ? (
                     <Pressable
                         style={[bleStyles.buttonBase, bleStyles.connectButton, (isScanning || isConnecting) ? bleStyles.buttonDisabled : {}]}
                         onPress={startScan}
@@ -115,15 +90,12 @@ export default function HomeScreen() {
                         <Text style={bleStyles.buttonText}>おみくじ箱に接続</Text>
                     </Pressable>
                 ) : null}
-                 {connectionPhase === 'permission_denied' && (
+                {connectionPhase === 'permission_denied' && (
                     <View style={bleStyles.permissionDeniedContainer}>
                         <Text style={bleStyles.permissionDeniedText}>
                             Bluetoothと位置情報の権限が必要です。
                         </Text>
-                        {/* <Pressable style={[bleStyles.buttonBase, bleStyles.permissionButton]} onPress={handleRequestPermissions}>
-                            <Text style={bleStyles.buttonText}>権限を再要求</Text>
-                        </Pressable> */}
-                         <Text style={bleStyles.permissionDeniedHelpText}>
+                        <Text style={bleStyles.permissionDeniedHelpText}>
                             アプリの設定画面から権限を許可してください。
                         </Text>
                     </View>
@@ -134,32 +106,34 @@ export default function HomeScreen() {
 
     const getIndicatorStyle = () => {
         switch (connectionPhase) {
-            case 'idle':
-                return { backgroundColor: '#E0E0E0' }; // アイドル時もグレー
-            case 'permission_denied':
-                return { backgroundColor: '#FF6347' }; // 権限拒否時は赤系（トマト）
-            case 'scanning':
-                return { backgroundColor: '#FFD700' };
-            case 'connecting':
-                return { backgroundColor: '#FFA500' };
-            case 'connected':
-                return { backgroundColor: '#4CAF50' };
-            case 'error':
-                return { backgroundColor: '#F44336' };
-            case 'initializing':
-                return { backgroundColor: '#A9A9A9' }; // 初期化中はダークグレー
-            default:
-                return { backgroundColor: '#E0E0E0' };
+            case 'idle': return { backgroundColor: '#E0E0E0' };
+            case 'permission_denied': return { backgroundColor: '#FF6347' };
+            case 'scanning': return { backgroundColor: '#FFD700' };
+            case 'connecting': return { backgroundColor: '#FFA500' };
+            case 'connected': return { backgroundColor: '#4CAF50' };
+            case 'error': return { backgroundColor: '#F44336' };
+            case 'initializing': return { backgroundColor: '#A9A9A9' };
+            default: return { backgroundColor: '#E0E0E0' };
         }
     };
+
+    // キャラクターロード中の表示
+    if (isCharacterLoading || !character) { // characterがnullの場合も考慮
+        return (
+            <SafeAreaView style={[styles.safeArea, styles.loadingContainer, getBackgroundColor()]}>
+                <ActivityIndicator size="large" color={colorScheme === 'dark' ? "#FFFFFF" : "#000000"} />
+                <Text style={styles.loadingText}>キャラクターを読み込み中...</Text>
+            </SafeAreaView>
+        );
+    }
+    // colorSchemeが未定義なので、仮の対応（実際にはuseColorSchemeをインポートするか、固定色にする）
+    const colorScheme = 'light'; // 仮
 
     return (
         <SafeAreaView style={[styles.safeArea, getBackgroundColor()]}>
             <View style={styles.container}>
-                {/* BLE接続エリアを画面上部に配置 */}
                 {renderBleConnectionArea()}
 
-                {/* キャラクター情報エリア (既存) */}
                 <View style={styles.characterInfoContainer}>
                     <Text style={styles.characterName}>{character.name}</Text>
                     <View style={styles.levelContainer}>
@@ -172,7 +146,6 @@ export default function HomeScreen() {
                     <Text style={styles.statusIcon}>{statusIcons[character.status]}</Text>
                 </View>
 
-                {/* キャラクター表示エリア (既存) */}
                 <Pressable onPress={handleCharacterPress} style={styles.characterPressable}>
                     <Animated.View style={{
                         transform: [{
@@ -182,6 +155,7 @@ export default function HomeScreen() {
                             })
                         }]
                     }}>
+                        {/* 画像URIはCharacterContextから供給されるものを使用 */}
                         <Image source={character.imageUri} style={styles.characterImage} />
                     </Animated.View>
                     {showGreeting && (
@@ -195,10 +169,20 @@ export default function HomeScreen() {
     );
 }
 
-// 既存のホーム画面スタイル (変更なし)
+// スタイル (ローディング関連のスタイルを追加)
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
+    },
+    loadingContainer: { // 追加
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: { // 追加
+        marginTop: 10,
+        fontSize: 16,
+        // colorはgetBackgroundColorと合わせるか、テーマに応じて設定
     },
     container: {
         flex: 1,
@@ -283,7 +267,7 @@ const styles = StyleSheet.create({
     },
 });
 
-// BLE接続エリア用のスタイル (微調整)
+// BLE接続エリア用のスタイル (変更なし)
 const bleStyles = StyleSheet.create({
     bleContainer: {
         width: '100%',
@@ -306,15 +290,13 @@ const bleStyles = StyleSheet.create({
         fontSize: 14,
         color: '#333333',
         textAlign: 'center',
-        minHeight: 35, // 2行分の高さを確保
+        minHeight: 35,
         marginBottom: 15,
-        paddingHorizontal:10,
+        paddingHorizontal: 10,
     },
-    activityIndicator: {
-        // marginBottom: 10, // ボタン表示時はボタンとの間にマージンができるので不要かも
-    },
+    activityIndicator: {},
     buttonBase: {
-        paddingVertical: 12, // 少し大きく戻す
+        paddingVertical: 12,
         paddingHorizontal: 25,
         borderRadius: 20,
         alignItems: 'center',
@@ -331,7 +313,7 @@ const bleStyles = StyleSheet.create({
         borderWidth: 1,
     },
     buttonDisabled: {
-        backgroundColor: '#A9A9A9', // 無効化時の色
+        backgroundColor: '#A9A9A9',
     },
     buttonText: {
         color: '#FFFFFF',
@@ -341,15 +323,15 @@ const bleStyles = StyleSheet.create({
     disconnectButtonText: {
         color: '#DC3545',
     },
-    permissionDeniedContainer: { // 権限拒否時のメッセージとボタン用コンテナ
+    permissionDeniedContainer: {
         alignItems: 'center',
         width: '90%',
     },
     permissionDeniedText: {
-        fontSize: 13, // 少し大きく
-        color: '#DC3545', //濃い赤
+        fontSize: 13,
+        color: '#DC3545',
         textAlign: 'center',
-        marginBottom: 5, // 次の行とのマージン
+        marginBottom: 5,
     },
     permissionDeniedHelpText: {
         fontSize: 12,
@@ -357,10 +339,6 @@ const bleStyles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 5,
     },
-    // permissionButton: { // 権限再要求ボタン（現在はコメントアウト）
-    //   backgroundColor: '#FFA500', // オレンジ
-    //   marginTop: 10,
-    // },
     backgroundMorning: { backgroundColor: '#87CEEB' },
     backgroundDay: { backgroundColor: '#ADD8E6' },
     backgroundEvening: { backgroundColor: '#4682B4' },
