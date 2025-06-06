@@ -2,56 +2,86 @@
 
 import MainLayout from '@/components/MainLayout';
 import { useBle } from '@/contexts/BleContext';
-import React, { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
+import ConfettiCannon from 'react-native-confetti-cannon';
 
 // 3段階の背景画像データ
 const BACKGROUND_STAGES = [
-  // 第1段階の背景画像
   require('@/assets/images/background/home_background_1.png'),
-  // 第2段階の背景画像
-  // 仮の画像を指定しています。用意された画像パスに差し替えてください。
   require('@/assets/images/background/home_background_2.png'),
-  // 第3段階の背景画像
-  // 仮の画像を指定しています。用意された画像パスに差し替えてください。
   require('@/assets/images/background/home_background_3.png'),
 ];
 
+// 段階ごとのパーティクルの設定
+const PARTICLE_CONFIGS = [
+  { count: 50, origin: { x: -10, y: 0 }, fallSpeed: 3000 }, // Stage 1
+  { count: 150, origin: { x: -10, y: 0 }, fallSpeed: 3000, explosionSpeed: 400 }, // Stage 2
+  { count: 250, origin: { x: -10, y: 0 }, fallSpeed: 3000, explosionSpeed: 500, colors: ["#ff0000", "#ffff00", "#0000ff"] }, // Stage 3 (豪華に)
+];
+
 export default function HomeScreen() {
-  const { setOmikujiTrigger } = useBle();
-  const [stageIndex, setStageIndex] = useState(0);
+  // ★ ContextからグローバルなstageIndexを取得
+  const { stageIndex } = useBle();
 
-  // BLEコンテキストに、shakeイベントで実行する処理を登録
+  const cannonRef = useRef<ConfettiCannon>(null);
+  const isFocused = useIsFocused();
+  const isInitialMount = useRef(true);
+
+  // 画面が表示されるたびにパーティクルを再生
   useEffect(() => {
-    const triggerGrowth = () => {
-      setStageIndex(currentStage => {
-        // 最後のステージより先には進まない
-        return Math.min(currentStage + 1, BACKGROUND_STAGES.length - 1);
-      });
-    };
-    setOmikujiTrigger(triggerGrowth);
+    // 初回マウント時は再生しない
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
 
-    // コンポーネントのアンマウント時に登録解除
-    return () => {
-      setOmikujiTrigger(null);
-    };
-  }, [setOmikujiTrigger]);
+    // 画面にフォーカスが当たったときに再生
+    if (isFocused) {
+      cannonRef.current?.start();
+    }
+  }, [isFocused]);
 
   const currentBackground = BACKGROUND_STAGES[stageIndex];
+  const currentParticleConfig = PARTICLE_CONFIGS[stageIndex];
 
   return (
-    <MainLayout
-      // プロファイル表示をオフにする
-      showCharacterProfile={false}
-      // 現在のステージの背景画像を渡す
-      backgroundImageSource={currentBackground}
-    >
-      {/* 中央のImageコンポーネントはなし */}
-    </MainLayout>
+    <View style={styles.container}>
+      <MainLayout
+        showCharacterProfile={false}
+        backgroundImageSource={currentBackground}
+      >
+        {/* MainLayoutの中は空 */}
+      </MainLayout>
+
+      {/* パーティクルコンポーネントを画面中央に配置 */}
+      <View style={styles.particleContainer} pointerEvents="none">
+        <ConfettiCannon
+          ref={cannonRef}
+          autoStart={false} // 自動再生はオフ
+          count={currentParticleConfig.count}
+          origin={currentParticleConfig.origin}
+          fallSpeed={currentParticleConfig.fallSpeed}
+          explosionSpeed={currentParticleConfig.explosionSpeed}
+          colors={currentParticleConfig.colors}
+        />
+      </View>
+    </View>
   );
 }
 
-// スタイルは現在使用していないため、削除または空にしても問題ありません。
 const styles = StyleSheet.create({
-
+  container: {
+    flex: 1,
+  },
+  particleContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

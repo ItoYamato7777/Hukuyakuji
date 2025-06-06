@@ -19,8 +19,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     icon: {
-        width: 45,
-        height: 45,
+        width: 70,
+        height: 70,
         resizeMode: 'contain',
     },
     text: {

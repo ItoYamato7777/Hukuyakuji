@@ -55,7 +55,7 @@ export default function RegisterScreen() {
   return (
     <MainLayout
       backgroundImageSource={require('@/assets/images/background/register_background.png')}
-      >
+    >
       <View style={styles.container}>
         <TouchableOpacity style={[styles.dropdownButton, { borderColor }]} onPress={() => setIsModalVisible(true)}>
           <ThemedText style={styles.dropdownButtonText}>
@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
     width: '100%',
+    backgroundColor: 'transparent', // 背景を透過させる
   },
   dropdownButton: {
     flexDirection: 'row',

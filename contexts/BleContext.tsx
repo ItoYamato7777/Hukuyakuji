@@ -25,6 +25,8 @@ const OMIKUJI_RESULTS = [
     { title: "小吉", message: "3ptをゲット！\n少しだけ成長した！" },
 ];
 
+const MAX_STAGES = 3; // 背景の最大段階数
+
 const bleManager = new BleManager();
 
 // Contextの型定義
@@ -37,11 +39,11 @@ interface BleContextState {
     statusMessage: string;
     showShakePopup: boolean;
     omikujiResult: { title: string; message: string } | null;
+    stageIndex: number; // キャラクターの成長段階
     requestPermissions: () => Promise<boolean>;
     startScan: () => void;
     disconnectDevice: () => void;
     closeShakePopup: () => void;
-    setOmikujiTrigger: (callback: (() => void) | null) => void;
 }
 
 const BleContext = createContext<BleContextState | undefined>(undefined);
@@ -54,7 +56,6 @@ export const useBle = (): BleContextState => {
     return context;
 };
 
-// Androidの権限リクエスト
 async function requestBluetoothPermissionsAndroid(): Promise<boolean> {
     if (Platform.OS === 'android') {
         const apiLevel = Platform.Version as number;
@@ -77,7 +78,6 @@ async function requestBluetoothPermissionsAndroid(): Promise<boolean> {
     return true;
 }
 
-// BleProviderコンポーネント
 export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
     const [isScanning, setIsScanning] = useState(false);
@@ -86,18 +86,17 @@ export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     const [statusMessage, setStatusMessage] = useState("BLE機能を初期化中...");
     const [showShakePopup, setShowShakePopup] = useState(false);
     const [omikujiResult, setOmikujiResult] = useState<{ title: string; message: string } | null>(null);
-    const [triggerOmikuji, setTriggerOmikuji] = useState<(() => void) | null>(null);
+    const [stageIndex, setStageIndex] = useState(0);
 
     const disconnectSubscriptionRef = useRef<Subscription | null>(null);
     const shakeEventSubscriptionRef = useRef<Subscription | null>(null);
-    const triggerOmikujiRef = useRef(triggerOmikuji);
-
-    useEffect(() => {
-        triggerOmikujiRef.current = triggerOmikuji;
-    }, [triggerOmikuji]);
 
     const addLog = useCallback((message: string) => {
         console.log(`[BleContext] ${new Date().toLocaleTimeString()}: ${message}`);
+    }, []);
+
+    const advanceStage = useCallback(() => {
+        setStageIndex(currentStage => Math.min(currentStage + 1, MAX_STAGES - 1));
     }, []);
 
     const requestPermissions = useCallback(async (): Promise<boolean> => {
@@ -138,9 +137,6 @@ export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
             (error, characteristic) => {
                 if (error) {
                     addLog(`シェイクイベント監視エラー: ${error.message}`);
-                    if (error.errorCode === 201) {
-                        // 切断はonDeviceDisconnectedで処理
-                    }
                     return;
                 }
                 if (characteristic?.value) {
@@ -260,12 +256,8 @@ export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     const closeShakePopup = () => {
         setShowShakePopup(false);
         setOmikujiResult(null);
-        triggerOmikujiRef.current?.();
+        advanceStage();
     };
-
-    const setOmikujiTrigger = useCallback((callback: (() => void) | null) => {
-        setTriggerOmikuji(() => callback);
-    }, []);
 
     const contextValue: BleContextState = {
         bleManagerInstance: bleManager,
@@ -276,11 +268,11 @@ export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
         statusMessage,
         showShakePopup,
         omikujiResult,
+        stageIndex,
         requestPermissions,
         startScan,
         disconnectDevice,
         closeShakePopup,
-        setOmikujiTrigger,
     };
 
     return (

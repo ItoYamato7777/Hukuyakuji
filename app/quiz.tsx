@@ -62,6 +62,7 @@ export default function QuizScreen() {
 
 const styles = StyleSheet.create({
     quizContainer: {
+        backgroundColor: 'transparent', // 背景を透過させる
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
