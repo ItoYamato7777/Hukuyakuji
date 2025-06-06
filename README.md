@@ -1,50 +1,100 @@
-# Welcome to your Expo app 👋
+# Hukuyakuji - キャラクター育成アプリケーション
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+このプロジェクトは、BLE（Bluetooth Low Energy）デバイスとの連携を主軸とした、React Native (Expo) 製のキャラクター育成アプリケーションです。物理的なデバイスからのイベントをトリガーに、アプリ内の世界が変化していく体験を提供します。
 
-## Get started
+## ✨ 主な機能
 
-1. Install dependencies
+* **BLEデバイス連携:**
+    * `Hukuyakuji` という名前の特定のBLEデバイスと通信します。
+    * デバイスから`"shake"`という信号を受信すると、アプリ内でイベントが発生します。
 
-   ```bash
-   npm install
-   ```
+* **ダイナミックなホーム画面:**
+    * BLEデバイスからの`"shake"`イベントをトリガーに、ホーム画面の背景が3段階に進化します。
+    * ホーム画面に遷移するたび、キャラクターの成長段階に応じた豪華なパーティクルエフェクトが表示されます。
 
-2. Start the app
+* **インタラクティブなポップアップ:**
+    * `"shake"`イベント受信時に、結果（大吉・中吉・小吉）を知らせるポップアップがどの画面にいても表示されます。
+    * ポップアップは結果に応じて色が変化するカスタムデザインです。
 
-   ```bash
-   npx expo start
-   ```
+* **多彩なアプリケーション機能:**
+    * **登録画面:** 薬の名前を入力して、新しいキャラクターを生成します。
+    * **図鑑画面:** 収集したアイテムを本のようにスワイプして閲覧できます。
+    * **クイズ画面:** 簡単なクイズゲームを楽しめます。
 
-In the output, you'll find options to open the app in a
+## 🚀 技術スタック
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+* React Native (Expo)
+* TypeScript
+* Expo Router (ファイルベースルーティング)
+* React Native BLE PLX (Bluetooth Low Energy 通信)
+* React Native Confetti Cannon (パーティクルエフェクト)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🛠️ セットアップと実行方法
 
-## Get a fresh project
+### 1. 依存パッケージのインストール
 
-When you're ready, run:
+プロジェクトに必要なライブラリをインストールします。
 
 ```bash
-npm run reset-project
-```
+npm install
+または
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Bash
 
-## Learn more
+yarn install
+次に、本プロジェクトで追加したライブラリをインストールします。
 
-To learn more about developing your project with Expo, look at the following resources:
+Bash
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+npx expo install react-native-ble-plx react-native-confetti-cannon react-native-svg buffer
+2. BLEデバイスの準備
+このアプリケーションを完全に動作させるには、以下の仕様で設定された物理的なBLEデバイスが必要です。
 
-## Join the community
+デバイス名: Hukuyakuji
+Service UUID: 4fafc201-1fb5-459e-8fcc-c5c9c331914a
+Characteristic UUID: beefcafe-36e1-4688-b7f5-00000000000c
+このCharacteristicは、"shake"というUTF-8文字列をGATT Notificationで送信するように設定してください。
+3. アプリケーションの起動
+以下のコマンドで開発サーバーを起動します。
 
-Join our community of developers creating universal apps.
+Bash
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+npx expo start
+表示されるQRコードをExpo Goアプリでスキャンするか、エミュレータ/シミュレータを選択してアプリを起動してください。
+
+【注意】
+本プロジェクトはExpo Routerを使用しているため、package.jsonのmainフィールドが正しく設定されている必要があります。
+
+JSON
+
+// package.json
+"main": "expo-router/entry"
+4. アプリケーションの初期化
+アプリのストレージや状態を完全にリセットしたい場合は、スマートフォンのタスクスイッチャーからアプリを完全に終了して、再起動してください。
+
+📁 プロジェクト構造
+hukumikuji_code/
+├── app/                  # 全てのスクリーン (Expo Routerが管理)
+│   ├── _layout.tsx       # ルートレイアウト、グローバルなProviderを配置
+│   ├── index.tsx         # ホーム画面
+│   ├── pokedex.tsx       # 図鑑画面
+│   ├── quiz.tsx          # クイズ画面
+│   └── register.tsx      # 登録画面
+│
+├── assets/               # 画像やフォントなどの静的ファイル
+│
+├── components/           # 画面をまたいで使用される再利用可能なコンポーネント
+│   ├── ble/              # BLE関連のUIコンポーネント
+│   ├── pokedex/          # 図鑑機能のコンポーネント
+│   ├── ui/               # 汎用的なUIコンポーネント
+│   ├── BottomNavBar.tsx  # カスタムナビゲーションバー
+│   ├── MainLayout.tsx    # 全画面の共通レイアウト
+│   └── ShakeResultPopup.tsx # BLEイベントで表示されるポップアップ
+│
+└── contexts/             # グローバルな状態管理のためのReact Context
+    └── BleContext.tsx    # BLE通信とキャラクターの成長段階を管理
+🤝 コミュニティ
+Expoを使ってユニバーサルアプリを開発するコミュニティに参加しましょう。
+
+Expo on GitHub: オープンソースプラットフォームを閲覧し、貢献する。
+Discord community: Expoユーザーとチャットし、質問する。
