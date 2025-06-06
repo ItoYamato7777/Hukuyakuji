@@ -11,9 +11,11 @@ export const Colors = {
     text: '#11181C',
     background: '#fff',
     tint: tintColorLight,
-    icon: '#687076',
+    icon: '#87CEEB', // 水色 (スカイブルー)
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    buttonDefault: '#87CEEB', // 水色 (スカイブルー)
+    buttonPressed: '#007AFF', // 青色 (iOS標準ブルー)
   },
   dark: {
     text: '#ECEDEE',
@@ -22,5 +24,7 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    buttonDefault: '#4682B4', // 暗めの水色 (スチールブルー)
+    buttonPressed: '#0A84FF', // 青色 (iOS標準ブルー Dark Mode)
   },
 };

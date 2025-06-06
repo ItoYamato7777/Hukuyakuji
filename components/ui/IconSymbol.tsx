@@ -14,10 +14,13 @@ type IconSymbolName = keyof typeof MAPPING;
  * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
  */
 const MAPPING = {
-  'house.fill': 'home',
-  'paperplane.fill': 'send',
-  'chevron.left.forwardslash.chevron.right': 'code',
-  'chevron.right': 'chevron-right',
+  'house.fill': 'home', // 既存
+  // 'paperplane.fill': 'send', // 元のサンプルで使用。不要なら削除可
+  // 'chevron.left.forwardslash.chevron.right': 'code', // 元のサンプルで使用。不要なら削除可
+  // 'chevron.right': 'chevron-right', // 元のサンプルで使用。不要なら削除可
+  'gearshape.fill': 'settings', // 設定アイコン用 (HeaderRight.tsx で使用)
+  'square.and.pencil': 'edit', // 登録タブアイコン用 (例: Material Icons の 'edit')
+  'book.fill': 'menu-book', // 図鑑タブアイコン用 (例: Material Icons の 'menu-book')
 } as IconMapping;
 
 /**
