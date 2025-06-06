@@ -8,23 +8,23 @@ const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#11181C',
+    text: '#00838f', // <-- ここの値を変更（例：'#111' から濃い水色へ）
     background: '#fff',
-    tint: tintColorLight,
-    icon: '#87CEEB', // 水色 (スカイブルー)
+    tint: '#0a7ea4',
+    icon: '#687076',
     tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-    buttonDefault: '#87CEEB', // 水色 (スカイブルー)
-    buttonPressed: '#007AFF', // 青色 (iOS標準ブルー)
+    tabIconSelected: '#0a7ea4',
+    buttonDefault: '#1e90ff',
+    buttonPressed: '#007bff',
   },
   dark: {
-    text: '#ECEDEE',
+    text: '#e0f7fa', // <-- ダークモードの文字色も必要に応じて変更
     background: '#151718',
-    tint: tintColorDark,
+    tint: '#fff',
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-    buttonDefault: '#4682B4', // 暗めの水色 (スチールブルー)
-    buttonPressed: '#0A84FF', // 青色 (iOS標準ブルー Dark Mode)
+    tabIconSelected: '#fff',
+    buttonDefault: '#1e90ff',
+    buttonPressed: '#007bff',
   },
 };

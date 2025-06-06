@@ -36,16 +36,20 @@ export default function ShakeResultPopup({ visible, onClose, result }: ShakeResu
         >
             <View style={styles.overlay}>
                 <View style={styles.popupContainer}>
+                    {/* 閉じるボタンはコンテナの右上に絶対配置 */}
                     <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                         <Text style={styles.closeButtonText}>×</Text>
                     </TouchableOpacity>
 
-                    <ThemedText style={[styles.title, { color: getTitleColor(result.title) }]}>
-                        {result.title}
-                    </ThemedText>
-                    <ThemedText style={styles.message}>
-                        {result.message}
-                    </ThemedText>
+                    {/* テキストコンテンツを新しいViewで囲む */}
+                    <View style={styles.contentWrapper}>
+                        <ThemedText style={[styles.title, { color: getTitleColor(result.title) }]}>
+                            {result.title}
+                        </ThemedText>
+                        <ThemedText style={styles.message}>
+                            {result.message}
+                        </ThemedText>
+                    </View>
                 </View>
             </View>
         </Modal>
@@ -65,9 +69,8 @@ const styles = StyleSheet.create({
         maxWidth: 320,
         backgroundColor: '#e0f7fa', // 薄い水色
         borderRadius: 15,
-        padding: 25,
-        paddingTop: 40, // タイトルと閉じるボタンのスペースを確保
-        alignItems: 'center',
+        // コンテナ自体のpaddingはシンプルに
+        padding: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
@@ -78,24 +81,30 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 10,
         right: 15,
+        // zIndexを高く設定して、他の要素より手前に表示
+        zIndex: 1,
     },
     closeButtonText: {
         fontSize: 32,
         color: '#00838f', // 濃い水色
         fontWeight: 'bold',
     },
+    // コンテンツを囲むためのラッパーを追加
+    contentWrapper: {
+        alignItems: 'center',
+        // 閉じるボタンと重ならないように上部にマージンを設定
+        marginTop: 25,
+    },
     title: {
-        fontSize: 40, // 少し大きくして見栄えを調整
+        fontSize: 40,
         fontWeight: 'bold',
         marginBottom: 20,
-        // 色はコンポーネント内で動的に設定
     },
     message: {
         textAlign: 'center',
         fontSize: 16,
         lineHeight: 24,
         color: '#ffffff', // 白色
-        // 読みやすさのため、わずかに影を追加
         textShadowColor: 'rgba(0, 0, 0, 0.5)',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 3,
