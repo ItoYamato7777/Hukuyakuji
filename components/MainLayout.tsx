@@ -123,11 +123,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     settingsButton: {
+        marginTop: 30,
         padding: 10,
     },
     settingsIcon: {
-        width: 35,
-        height: 38,
+        width: 45,
+        height: 50,
     },
     settingsText: {
         fontFamily: 'A_P-OTF_PuhuPicnic_Min2-H',

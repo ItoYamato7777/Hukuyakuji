@@ -25,7 +25,7 @@ export default function PokedexScreen() {
   }
 
   return (
-    <MainLayout>
+    <MainLayout backgroundImageSource={require('@/assets/images/background/pokedex_background.png')}>
       <View style={styles.container}>
         <FlatList
           data={PAGES_DATA}

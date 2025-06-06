@@ -12,7 +12,7 @@ const NAV_ICONS = {
     // 適切な戻る矢印などのアイコンがあれば、パスを差し替えてください。
     back: require('@/assets/images/icon/back_icon.png'),
     // 現在の画面が見つからなかった場合のデフォルトアイコン
-    default: require('@/assets/images/icon.png'),
+    default: require('@/assets/images/icon/setting_icon.png'),
 };
 
 const BottomNavBar = () => {

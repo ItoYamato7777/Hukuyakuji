@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 export default function SettingsScreen() {
   return (
-    <MainLayout>
+    <MainLayout backgroundImageSource={require('@/assets/images/background/setting_background.png')}>
       <View style={styles.container}>
         <ThemedText type="title">設定画面</ThemedText>
         <ThemedText style={styles.content}>

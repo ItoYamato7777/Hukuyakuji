@@ -3,44 +3,18 @@
 import MainLayout from '@/components/MainLayout';
 import { useBle } from '@/contexts/BleContext';
 import React, { useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
 
-// 3段階のキャラクターデータ（背景画像とプロファイル）
-const CHARACTER_STAGES = [
-  {
-    // 第1段階の背景画像
-    background: require('@/assets/images/background/home_background_1.png'),
-    profile: {
-      status: 'うまれたて',
-      name: 'ジゴキシン 神',
-      nameSuffix: 'がみ',
-      level: 3,
-      nextExp: 50,
-    }
-  },
-  {
-    // 第2段階の背景画像
-    // 仮の画像を指定しています。用意された画像パスに差し替えてください。
-    background: require('@/assets/images/background/home_background_2.png'),
-    profile: {
-      status: 'すこし育った',
-      name: 'ジゴキシン 神',
-      nameSuffix: 'がみ',
-      level: 5,
-      nextExp: 100,
-    }
-  },
-  {
-    // 第3段階の背景画像
-    // 仮の画像を指定しています。用意された画像パスに差し替えてください。
-    background: require('@/assets/images/background/home_background_3.png'),
-    profile: {
-      status: '最終形態',
-      name: 'ジゴキシン EX',
-      nameSuffix: 'いーえっくす',
-      level: 10,
-      nextExp: 999,
-    }
-  }
+// 3段階の背景画像データ
+const BACKGROUND_STAGES = [
+  // 第1段階の背景画像
+  require('@/assets/images/background/home_background_1.png'),
+  // 第2段階の背景画像
+  // 仮の画像を指定しています。用意された画像パスに差し替えてください。
+  require('@/assets/images/background/home_background_2.png'),
+  // 第3段階の背景画像
+  // 仮の画像を指定しています。用意された画像パスに差し替えてください。
+  require('@/assets/images/background/home_background_3.png'),
 ];
 
 export default function HomeScreen() {
@@ -52,7 +26,7 @@ export default function HomeScreen() {
     const triggerGrowth = () => {
       setStageIndex(currentStage => {
         // 最後のステージより先には進まない
-        return Math.min(currentStage + 1, CHARACTER_STAGES.length - 1);
+        return Math.min(currentStage + 1, BACKGROUND_STAGES.length - 1);
       });
     };
     setOmikujiTrigger(triggerGrowth);
@@ -63,15 +37,21 @@ export default function HomeScreen() {
     };
   }, [setOmikujiTrigger]);
 
-  const currentStage = CHARACTER_STAGES[stageIndex];
+  const currentBackground = BACKGROUND_STAGES[stageIndex];
 
   return (
     <MainLayout
-      showCharacterProfile={true}
-      characterData={currentStage.profile} // 現在のステージのプロファイルを渡す
-      backgroundImageSource={currentStage.background} // 現在のステージの背景画像を渡す
+      // プロファイル表示をオフにする
+      showCharacterProfile={false}
+      // 現在のステージの背景画像を渡す
+      backgroundImageSource={currentBackground}
     >
-      {/* 中央のImageコンポーネントは削除しました */}
+      {/* 中央のImageコンポーネントはなし */}
     </MainLayout>
   );
 }
+
+// スタイルは現在使用していないため、削除または空にしても問題ありません。
+const styles = StyleSheet.create({
+
+});
