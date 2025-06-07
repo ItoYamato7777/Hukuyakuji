@@ -79,13 +79,13 @@ const styles = StyleSheet.create({
     },
     closeButton: {
         position: 'absolute',
-        top: 10,
-        right: 15,
+        top: 20,
+        right: 20,
         // zIndexを高く設定して、他の要素より手前に表示
-        zIndex: 1,
+        zIndex: 2,
     },
     closeButtonText: {
-        fontSize: 32,
+        fontSize: 40,
         color: '#00838f', // 濃い水色
         fontWeight: 'bold',
     },
@@ -96,9 +96,9 @@ const styles = StyleSheet.create({
         marginTop: 25,
     },
     title: {
-        fontSize: 40,
+        fontSize: 30,
         fontWeight: 'bold',
-        marginBottom: 20,
+        // marginBottom: 20,
     },
     message: {
         textAlign: 'center',

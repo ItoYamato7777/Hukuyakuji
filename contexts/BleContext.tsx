@@ -40,6 +40,8 @@ interface BleContextState {
     showShakePopup: boolean;
     omikujiResult: { title: string; message: string } | null;
     stageIndex: number; // キャラクターの成長段階
+    shootParticles: () => void; // ★ パーティクルを発生させる関数を追加
+    registerParticleShooter: (func: () => void) => void; // ★ パーティクルの実装を登録する関数を追加
     requestPermissions: () => Promise<boolean>;
     startScan: () => void;
     disconnectDevice: () => void;
@@ -88,6 +90,19 @@ export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     const [omikujiResult, setOmikujiResult] = useState<{ title: string; message: string } | null>(null);
     const [stageIndex, setStageIndex] = useState(0);
 
+    // ★ パーティクル関連のstateと関数を追加
+    const [particleShooter, setParticleShooter] = useState<{ shoot: () => void } | null>(null);
+
+    const registerParticleShooter = useCallback((func: () => void) => {
+        setParticleShooter({ shoot: func });
+    }, []);
+
+    const shootParticles = useCallback(() => {
+        if (particleShooter) {
+            particleShooter.shoot();
+        }
+    }, [particleShooter]);
+
     const disconnectSubscriptionRef = useRef<Subscription | null>(null);
     const shakeEventSubscriptionRef = useRef<Subscription | null>(null);
 
@@ -114,6 +129,13 @@ export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
         }
         return permissionsGranted;
     }, [addLog]);
+
+    // ★ ポップアップ表示時にパーティクルを発生させる
+    useEffect(() => {
+        if (showShakePopup) {
+            shootParticles();
+        }
+    }, [showShakePopup, shootParticles]);
 
     useEffect(() => {
         const sub = bleManager.onStateChange((state) => {
@@ -269,6 +291,8 @@ export const BleProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
         showShakePopup,
         omikujiResult,
         stageIndex,
+        shootParticles,
+        registerParticleShooter,
         requestPermissions,
         startScan,
         disconnectDevice,
