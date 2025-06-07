@@ -67,10 +67,12 @@ const styles = StyleSheet.create({
     popupContainer: {
         width: '100%',
         maxWidth: 320,
+        height: 'auto',
+        maxHeight: '80%',
         backgroundColor: '#e0f7fa', // 薄い水色
         borderRadius: 15,
         // コンテナ自体のpaddingはシンプルに
-        padding: 20,
+        padding: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
